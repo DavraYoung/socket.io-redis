@@ -1,11 +1,11 @@
 {
-  "name": "socket.io-redis",
-  "version": "6.0.1",
+  "name": "socket.io-redis-fork",
+  "version": "6.0.2",
   "description": "",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@github.com:socketio/socket.io-redis.git"
+    "url": "https://github.com/DavraYoung/socket.io-redis"
   },
   "files": [
     "dist/"

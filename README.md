@@ -1,7 +1,14 @@
-# socket.io-redis
+# socket.io-redis fork
 
 [![Build Status](https://travis-ci.org/socketio/socket.io-redis.svg?branch=master)](https://travis-ci.org/socketio/socket.io-redis)
 [![NPM version](https://badge.fury.io/js/socket.io-redis.svg)](http://badge.fury.io/js/socket.io-redis)
+
+### Forked from [here](https://github.com/socketio/socket.io-redis)
+
+## Differences from official:
+
+- added remoteSocketRooms function
+
 
 ## Table of contents
 

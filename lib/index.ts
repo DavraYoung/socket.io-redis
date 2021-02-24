@@ -17,6 +17,7 @@ enum RequestType {
   REMOTE_JOIN = 2,
   REMOTE_LEAVE = 3,
   REMOTE_DISCONNECT = 4,
+  SOCKET_ROOMS = 5,
 }
 
 interface Request {
@@ -221,6 +222,21 @@ export class RedisAdapter extends Adapter {
         this.pubClient.publish(this.responseChannel, response);
         break;
 
+      case RequestType.SOCKET_ROOMS: {
+        const socketId = request.sid;
+        const rooms = this.sids.get(socketId);
+        if (rooms == null) {
+          return;
+        }
+        response = JSON.stringify({
+          requestId: request.requestId,
+          rooms: [...rooms]
+        });
+
+        this.pubClient.publish(this.responseChannel, response);
+        break;
+      }
+
       case RequestType.REMOTE_JOIN:
         socket = this.nsp.sockets.get(request.sid);
         if (!socket) {
@@ -332,6 +348,23 @@ export class RedisAdapter extends Adapter {
         }
         break;
 
+      case RequestType.SOCKET_ROOMS:
+        request.msgCount++;
+
+        // ignore if response does not contain 'rooms' key
+        if (!response.rooms || !Array.isArray(response.rooms)) return;
+
+        response.rooms.forEach((s) => request.rooms.add(s));
+
+        if (request.msgCount === request.numSub) {
+          clearTimeout(request.timeout);
+          if (request.resolve) {
+            request.resolve(request.rooms);
+          }
+          this.requests.delete(requestId);
+        }
+        break;
+
       case RequestType.REMOTE_JOIN:
       case RequestType.REMOTE_LEAVE:
       case RequestType.REMOTE_DISCONNECT:
@@ -415,6 +448,51 @@ export class RedisAdapter extends Adapter {
 
       this.pubClient.publish(this.requestChannel, request);
     });
+  }
+
+  /**
+   * Gets the list of rooms a given socket has joined.
+   *
+   * @param {SocketId} id   the socket id
+   */
+  public async remoteSocketRooms(id: SocketId): Promise<Set<Room> | undefined> {
+    const localRooms = this.sids.get(id);
+    if (localRooms != null) {
+      return localRooms
+    } else {
+      const requestId = uid2(6);
+
+      const numSub = await this.getNumSub();
+      debug('waiting for %d responses to "sockets" request', numSub);
+
+      const request = JSON.stringify({
+        requestId,
+        type: RequestType.SOCKETS,
+        sid: id
+      });
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          if (this.requests.has(requestId)) {
+            reject(
+              new Error("timeout reached while waiting for socket rooms response")
+            );
+            this.requests.delete(requestId);
+          }
+        }, this.requestsTimeout);
+
+        this.requests.set(requestId, {
+          type: RequestType.SOCKET_ROOMS,
+          numSub,
+          resolve,
+          timeout,
+          msgCount: 0,
+          rooms: new Set(),
+
+        });
+        this.pubClient.publish(this.requestChannel, request);
+      });
+    }
   }
 
   /**
